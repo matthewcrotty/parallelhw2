@@ -395,18 +395,17 @@ void cla()
 
     //int block_size = 256;
     //int numBlocks = (bits + block_size -1)/ block_size;
-    compute_gp_test<<<bits, bits/256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    compute_gp_test<<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
-
+    cudaDeviceSynchronize();
 
     compute_gp();
-
+    int count = 0;
     for(int i = 0; i < bits; i++)
         if(gi[i] != gi_cuda[i]){
-            printf("NOT THE SAME\n");
-            break;
+            count++;
         }
-
+    printf("%d wrong\n", count);
     compute_group_gp();
     compute_section_gp();
     compute_super_section_gp();
