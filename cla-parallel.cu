@@ -393,12 +393,20 @@ void cla()
         bin2_cuda[i] = bin2[i];
     }
 
-    // int block_size = 256;
-    // int numBlocks = (bits + block_size -1)/ block_size;
+    //int block_size = 256;
+    //int numBlocks = (bits + block_size -1)/ block_size;
     compute_gp_test<<<bits, bits/256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
 
+
     compute_gp();
+
+    for(int i = 0; i < bits; i++)
+        if(gi[i] != gi_cuda[i]){
+            printf("NOT THE SAME\n");
+            break;
+        }
+
     compute_group_gp();
     compute_section_gp();
     compute_super_section_gp();
