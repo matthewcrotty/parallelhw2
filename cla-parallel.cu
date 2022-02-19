@@ -7,7 +7,7 @@
 #include "main.h"
 
 //Touch these defines
-#define input_size 8388608 // hex digits 
+#define input_size 8388608 // hex digits
 #define block_size 32
 #define verbose 0
 
@@ -67,17 +67,23 @@ void read_input()
       printf("Failed to read input 2\n");
       exit(-1);
     }
-  
+
   hex1 = grab_slice_char(in1,0,input_size+1);
   hex2 = grab_slice_char(in2,0,input_size+1);
-  
+
   free(in1);
   free(in2);
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+__global__
+void compute_gp_test(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    gi_c[index] = bin1_c[index] & bin2_c[index];
+    pi_c[index] = bin1_c[index] | bin2_c[index];
+}
 
 void compute_gp()
 {
@@ -89,7 +95,7 @@ void compute_gp()
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_group_gp()
@@ -126,7 +132,7 @@ void compute_group_gp()
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_section_gp()
@@ -136,7 +142,7 @@ void compute_section_gp()
       int kstart = k*block_size;
       int* sgk_group = grab_slice(ggj,kstart,block_size);
       int* spk_group = grab_slice(gpj,kstart,block_size);
-      
+
       int sum = 0;
       for(int i = 0; i < block_size; i++)
         {
@@ -148,14 +154,14 @@ void compute_section_gp()
 	  sum |= mult;
         }
       sgk[k] = sum;
-      
+
       int mult = spk_group[0];
       for(int i = 1; i < block_size; i++)
         {
 	  mult &= spk_group[i];
         }
       spk[k] = mult;
-      
+
       // free from grab_slice allocation
       free(sgk_group);
       free(spk_group);
@@ -163,7 +169,7 @@ void compute_section_gp()
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_super_section_gp()
@@ -173,7 +179,7 @@ void compute_super_section_gp()
       int lstart = l*block_size;
       int* ssgl_group = grab_slice(sgk,lstart,block_size);
       int* sspl_group = grab_slice(spk,lstart,block_size);
-      
+
       int sum = 0;
       for(int i = 0; i < block_size; i++)
         {
@@ -185,14 +191,14 @@ void compute_super_section_gp()
 	  sum |= mult;
         }
       ssgl[l] = sum;
-      
+
       int mult = sspl_group[0];
       for(int i = 1; i < block_size; i++)
         {
 	  mult &= sspl_group[i];
         }
       sspl[l] = mult;
-      
+
       // free from grab_slice allocation
       free(ssgl_group);
       free(sspl_group);
@@ -200,7 +206,7 @@ void compute_super_section_gp()
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_super_super_section_gp()
@@ -210,7 +216,7 @@ void compute_super_super_section_gp()
       int mstart = m*block_size;
       int* sssgm_group = grab_slice(ssgl,mstart,block_size);
       int* ssspm_group = grab_slice(sspl,mstart,block_size);
-      
+
       int sum = 0;
       for(int i = 0; i < block_size; i++)
         {
@@ -222,14 +228,14 @@ void compute_super_super_section_gp()
 	  sum |= mult;
         }
       sssgm[m] = sum;
-      
+
       int mult = ssspm_group[0];
       for(int i = 1; i < block_size; i++)
         {
 	  mult &= ssspm_group[i];
         }
       ssspm[m] = mult;
-      
+
       // free from grab_slice allocation
       free(sssgm_group);
       free(ssspm_group);
@@ -237,7 +243,7 @@ void compute_super_super_section_gp()
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_super_super_section_carry()
@@ -253,13 +259,13 @@ void compute_super_super_section_carry()
         {
 	  ssscmlast = ssscm[m-1];
         }
-      
+
       ssscm[m] = sssgm[m] | (ssspm[m]&ssscmlast);
     }
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_super_section_carry()
@@ -275,13 +281,13 @@ void compute_super_section_carry()
         {
 	  sscllast = sscl[l-1];
         }
-      
+
       sscl[l] = ssgl[l] | (sspl[l]&sscllast);
     }
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_section_carry()
@@ -297,14 +303,14 @@ void compute_section_carry()
         {
 	  scklast = sck[k-1];
         }
-      
+
       sck[k] = sgk[k] | (spk[k]&scklast);
     }
 }
 
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_group_carry()
@@ -320,13 +326,13 @@ void compute_group_carry()
         {
 	  gcjlast = gcj[j-1];
         }
-      
+
       gcj[j] = ggj[j] | (gpj[j]&gcjlast);
     }
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_carry()
@@ -342,13 +348,13 @@ void compute_carry()
         {
 	  clast = ci[i-1];
         }
-      
+
       ci[i] = gi[i] | (pi[i]&clast);
     }
 }
 
 /***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL 
+// ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
 void compute_sum()
@@ -374,6 +380,24 @@ void cla()
   // ADAPT ALL THESE FUNCTUIONS TO BE SEPARATE CUDA KERNEL CALL
   // NOTE: Kernel calls are serialized by default per the CUDA kernel call scheduler
   /***********************************************************************************************************/
+    int* gi_cuda, *pi_cuda;
+    cudaMallocManaged(&gi_cuda, bits*sizeof(int));
+    cudaMallocManaged(&pi_cuda, bits*sizeof(int));
+
+    int* bin1_cuda, *bin2_cuda;
+    cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
+    cudaMallocManaged(&bin2_cuda, bits*sizeof(int));
+
+    for(int i = 0; i < bits; i++){
+        bin1_cuda[i] = bin1[i];
+        bin2_cuda[i] = bin2[i];
+    }
+
+    int block_size = 256;
+    int numBlocks = (bits + block_size -1)/ block_size;
+    compute_gp_test<<<bits, numBlocks>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+
+
     compute_gp();
     compute_group_gp();
     compute_section_gp();
@@ -436,12 +460,12 @@ int main(int argc, char *argv[])
 	     nsupersupersections, block_size );
       return(-1);
     }
-  
+
   if (argc == 2) {
     if (strcmp(argv[1], "-r") == 0)
       randomGenerateFlag = 1;
   }
-  
+
   if (randomGenerateFlag == 0)
     {
       read_input();
@@ -452,12 +476,12 @@ int main(int argc, char *argv[])
       hex1 = generate_random_hex(input_size);
       hex2 = generate_random_hex(input_size);
     }
-  
+
   hexa = prepend_non_sig_zero(hex1);
   hexb = prepend_non_sig_zero(hex2);
   hexa[digits] = '\0'; //double checking
   hexb[digits] = '\0';
-  
+
   bin1 = gen_formated_binary_from_hex(hexa);
   bin2 = gen_formated_binary_from_hex(hexb);
 
@@ -485,11 +509,11 @@ int main(int argc, char *argv[])
   free(int2str_result);
   free(hex1);
   free(hex2);
-  
+
   // free bin conversion of hex inputs
   free(bin1);
   free(bin2);
-  
+
   if( verbose==1 )
     {
       printf("Hex Input\n");
@@ -498,21 +522,21 @@ int main(int argc, char *argv[])
       printf("b   ");
       print_chararrayln(hexb);
     }
-  
+
   if ( verbose==1 )
     {
       printf("Hex Return\n");
       printf("sum =  ");
     }
-  
+
   // free memory from prepend call
   free(hexa);
   free(hexb);
 
   if( verbose==1 )
     printf("%s\n",hexSum);
-  
+
   free(hexSum);
-  
+
   return 1;
 }
