@@ -393,9 +393,9 @@ void cla()
         bin2_cuda[i] = bin2[i];
     }
 
-    int block_size = 256;
-    int numBlocks = (bits + block_size -1)/ block_size;
-    compute_gp_test<<<bits, numBlocks>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    // int block_size = 256;
+    // int numBlocks = (bits + block_size -1)/ block_size;
+    compute_gp_test<<<bits, bits/256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
 
     compute_gp();
