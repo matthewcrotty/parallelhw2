@@ -103,10 +103,22 @@ template <int blockSize>
 __global__ void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < 1048577){
+        int jstart = index * blockSize;
+        int sum = 0;
         for(int i = 0; i < blockSize; i++){
-            int jstart = index * blockSize;
-            
+            int mult = gi_c[jstart + i];
+            for(int ii = blockSize-1; ii > i; ii--){
+                mult &= pi_c[jstart + i];
+            }
+            sum |= mult;
         }
+        ggj_c[index] = sum;
+
+        int mult = pi_c[jstart];
+        for(int i = 1; i < blockSize; i++){
+            mult &= pi_c[jstart + i];
+        }
+        gpj_c[index] = mult;
     }
 
 }
@@ -420,6 +432,21 @@ void cla()
 
     compute_gp();
     compute_group_gp();
+
+    int count = 0;
+    for(int i = 0; i < ngroups; i++){
+        if(ggj_cuda[i] != ggj[i]){
+            count++;
+        }
+    }
+    int count2 = 0;
+    for(int i = 0; i < ngroups; i++){
+        if(gpj_cuda[i] != gpj[i]){
+            count2++;
+        }
+    }
+    printf("%d %d\n", count, count2);
+    
     compute_section_gp();
     compute_super_section_gp();
     compute_super_super_section_gp();
