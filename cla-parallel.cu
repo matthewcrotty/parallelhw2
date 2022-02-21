@@ -79,7 +79,7 @@ void read_input()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 __global__
-void compute_gp_test(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
+void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     gi_c[index] = bin1_c[index] & bin2_c[index];
     pi_c[index] = bin1_c[index] | bin2_c[index];
@@ -97,6 +97,10 @@ void compute_gp()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+__global__
+void compute_group_gp_c(){
+
+}
 
 void compute_group_gp()
 {
@@ -395,17 +399,12 @@ void cla()
 
     //int block_size = 256;
     //int numBlocks = (bits + block_size -1)/ block_size;
-    compute_gp_test<<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    compute_gp_c<<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
     cudaDeviceSynchronize();
 
     compute_gp();
-    int count = 0;
-    for(int i = 0; i < bits; i++)
-        if(gi[i] != gi_cuda[i]){
-            count++;
-        }
-    printf("%d wrong\n", count);
+
     compute_group_gp();
     compute_section_gp();
     compute_super_section_gp();
@@ -417,9 +416,15 @@ void cla()
     compute_carry();
     compute_sum();
 
+    cuda
+
   /***********************************************************************************************************/
   // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
   /***********************************************************************************************************/
+  cudaFree(gi_cuda);
+  cudaFree(pi_cuda);
+  cudaFree(bin1_cuda);
+  cudaFree(bin2_cuda);
 }
 
 void ripple_carry_adder()
