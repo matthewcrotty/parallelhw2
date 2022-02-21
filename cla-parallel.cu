@@ -428,25 +428,38 @@ void cla()
     cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
     cudaMallocManaged(&gpj_cuda, ngroups*sizeof(int));
 
+    for(int i = 0; i < ngroups; i++){
+        ggj_cuda[i] = 10;
+        gpj_cuda[i] = 10;
+    }
+
     compute_group_gp_c<block_size><<<(ngroups + 256 -1)/256, 256>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
 
     compute_gp();
     compute_group_gp();
 
     int count = 0;
+    int count3 = 0;
     for(int i = 0; i < ngroups; i++){
         if(ggj_cuda[i] != ggj[i]){
             count++;
         }
+        if(ggj_cuda[i] == 10){
+            count3++;
+        }
     }
     int count2 = 0;
+    int count3 = 0;
     for(int i = 0; i < ngroups; i++){
         if(gpj_cuda[i] != gpj[i]){
             count2++;
         }
+        if(gpj_cuda[i] == 10){
+            count4++;
+        }
     }
-    printf("%d %d\n", count, count2);
-    
+    printf("%d %d %d %d\n", count, count2, count3, count4);
+
     compute_section_gp();
     compute_super_section_gp();
     compute_super_super_section_gp();
