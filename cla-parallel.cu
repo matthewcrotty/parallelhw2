@@ -79,10 +79,13 @@ void read_input()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 __global__
+template <int numBits>
 void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    gi_c[index] = bin1_c[index] & bin2_c[index];
-    pi_c[index] = bin1_c[index] | bin2_c[index];
+    if(index < numBits){ //hard coded number of bits.
+        gi_c[index] = bin1_c[index] & bin2_c[index];
+        pi_c[index] = bin1_c[index] | bin2_c[index];
+    }
 }
 
 void compute_gp()
@@ -98,7 +101,15 @@ void compute_gp()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 __global__
-void compute_group_gp_c(){
+template <int blockSize>
+void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index < 1048577){
+        for(int i = 0; i < blockSize; i++){
+            int jstart = index * blockSize;
+            
+        }
+    }
 
 }
 
@@ -399,12 +410,17 @@ void cla()
 
     //int block_size = 256;
     //int numBlocks = (bits + block_size -1)/ block_size;
-    compute_gp_c<<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    compute_gp_c<bits><<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
     cudaDeviceSynchronize();
 
-    compute_gp();
+    int* ggj_cuda, *gpj_cuda;
+    cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
+    cudaMallocManaged(&gpj_cuda, ngroups*sizeof(int));
 
+    compute_group_gp<block_size><<<(ngroups + 256 -1)/256, 256>>>(ggj_cuda, gpg_cuda, gi_cuda, pi_cuda);
+
+    compute_gp();
     compute_group_gp();
     compute_section_gp();
     compute_super_section_gp();
