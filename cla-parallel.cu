@@ -277,7 +277,7 @@ void compute_super_section_gp()
 /***********************************************************************************************************/
 
 template <int blockSize>
-__global__ void compute_super_super_section_cp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
+__global__ void compute_super_super_section_gp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < 33){
         int mstart = index * blockSize;
@@ -336,6 +336,20 @@ void compute_super_super_section_gp()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
+// I dont think this one can be parellilized.
+void compute_super_super_section_carry_c(int* ssscm_c, int* sssgm_c, int* ssspm_c, int n){
+    for(int m = 0; m < n; m++){
+        int ssscmlast = 0;
+        if(m == 0){
+            ssscmlast = 0;
+        } else{
+            ssscmlast = ssscm_c[m-1];
+        }
+        ssscm_c[m] = sssgm_c[m] | (ssspm[m] & ssscmlast);
+    }
+
+}
+
 void compute_super_super_section_carry()
 {
   for(int m = 0; m < nsupersupersections; m++)
@@ -357,7 +371,18 @@ void compute_super_super_section_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+template <int blockSize>
+__global__ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* ssscm_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    sscl_c[index * blockSize] = ssgl_c[index * blockSize] | (sspl_c[index * blockSize] & ssscm_c[index]);
+    index *= blockSize;
+    for(int l = 1; l < blockSize; l++){
+        if(index + l < 1025){
+            sscl_c[index + l] = ssgl_c[index + l] | (sspl_c[index + l] & sscl_c[index + l -1]);
+        }
+    }
 
+}
 void compute_super_section_carry()
 {
   for(int l = 0; l < nsupersections; l++)
@@ -470,9 +495,7 @@ void cla()
   // ADAPT ALL THESE FUNCTUIONS TO BE SEPARATE CUDA KERNEL CALL
   // NOTE: Kernel calls are serialized by default per the CUDA kernel call scheduler
   /***********************************************************************************************************/
-    int* gi_cuda, *pi_cuda;
-    cudaMallocManaged(&gi_cuda, bits*sizeof(int));
-    cudaMallocManaged(&pi_cuda, bits*sizeof(int));
+
 
     int* bin1_cuda, *bin2_cuda;
     cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
@@ -485,9 +508,11 @@ void cla()
 
     //int block_size = 256;
     //int numBlocks = (bits + block_size -1)/ block_size;
-    compute_gp_c<bits><<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    int* gi_cuda, *pi_cuda;
+    cudaMallocManaged(&gi_cuda, bits*sizeof(int));
+    cudaMallocManaged(&pi_cuda, bits*sizeof(int));
 
-    cudaDeviceSynchronize();
+    compute_gp_c<bits><<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
     int* ggj_cuda, *gpj_cuda;
     cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
@@ -513,19 +538,29 @@ void cla()
 
     compute_super_section_gp_c<block_size><<<(nsupersupersections + 256 -1)/256, 256>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
 
+    int* ssscm_cuda;
+    cudaMallocManaged(&ssscm_cuda, nsupersupersections*sizeof(int));
+    compute_super_super_section_carry_c(ssscm_cuda, sssgm_cuda, ssspm_cuda, nsupersupersections);
+
+    int* sscl_cuda;
+    cudaMallocManaged(&sscl_cuda, nsupersections*sizeof(int));
+    compute_super_section_carry_c<block_size><<<(nsupersupersections + 256 -1)/256, 256>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
+
     compute_gp(); //p
     compute_group_gp(); //p
     compute_section_gp(); //p
     compute_super_section_gp(); //p
     compute_super_super_section_gp(); //p
+    compute_super_super_section_carry(); //p?
+    compute_super_section_carry(); //p
 
     int count = 0;
-    for(int i = 0; i < nsupersupersections; i++)
-        if(sssgm_cuda[i] != sssgm[i]) count++;
-    printf("%d \n", count);
-
-    compute_super_super_section_carry();
-    compute_super_section_carry();
+    for(int i = 0; i < nsupersections; i++)
+        if(sscl_cuda[i] != sscl[i]){
+            count++;
+        }
+    printf("%d\n", count);
+    
     compute_section_carry();
     compute_group_carry();
     compute_carry();
@@ -535,10 +570,22 @@ void cla()
   /***********************************************************************************************************/
   // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
   /***********************************************************************************************************/
-  cudaFree(gi_cuda);
-  cudaFree(pi_cuda);
+  cudaDeviceSynchronize();
+
   cudaFree(bin1_cuda);
   cudaFree(bin2_cuda);
+  cudaFree(gi_cuda);
+  cudaFree(pi_cuda);
+  cudaFree(ggj_cuda);
+  cudaFree(gpj_cuda);
+  cudaFree(sgk_cuda);
+  cudaFree(spk_cuda);
+  cudaFree(ssgl_cuda);
+  cudaFree(sspl_cuda);
+  cudaFree(sssgm_cuda);
+  cudaFree(ssspm_cuda);
+
+
 }
 
 void ripple_carry_adder()
