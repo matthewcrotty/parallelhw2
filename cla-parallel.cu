@@ -108,7 +108,7 @@ __global__ void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c)
         for(int i = 0; i < blockSize; i++){
             int mult = gi_c[jstart + i];
             for(int ii = blockSize-1; ii > i; ii--){
-                mult &= pi_c[jstart + i];
+                mult &= pi_c[jstart + ii];
             }
             sum |= mult;
         }
@@ -159,43 +159,85 @@ void compute_group_gp()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+template <int blockSize>
+__global__ void compute_section_gp_c(int* sgk_c, int* spk_c, int* ggj_c, int* gpj_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index < 32769){
+        int kstart = index * blockSize;
+        int sum = 0;
+        for(int i = 0; i < blockSize; i++){
+            int mult = ggj_c[kstart + i];
+            for(int ii = blockSize-1; ii > i; ii--){
+                mult &= gpj_c[kstart + ii];
+            }
+            sum |= mult;
+        }
+        sgk_c[index] = sum;
+
+        int mult = gpj_c[kstart];
+        for(int i = 1; i < blockSize; i++){
+            mult &= gpj_c[kstart + 1];
+        }
+        spk_c[index] = mult;
+    }
+}
+
 
 void compute_section_gp()
 {
-  for(int k = 0; k < nsections; k++)
-    {
-      int kstart = k*block_size;
-      int* sgk_group = grab_slice(ggj,kstart,block_size);
-      int* spk_group = grab_slice(gpj,kstart,block_size);
+    for(int k = 0; k < nsections; k++){
+        int kstart = k*block_size;
+        int* sgk_group = grab_slice(ggj,kstart,block_size);
+        int* spk_group = grab_slice(gpj,kstart,block_size);
 
-      int sum = 0;
-      for(int i = 0; i < block_size; i++)
-        {
-	  int mult = sgk_group[i];
-	  for(int ii = block_size-1; ii > i; ii--)
-            {
-	      mult &= spk_group[ii];
+        int sum = 0;
+        for(int i = 0; i < block_size; i++){
+            int mult = sgk_group[i];
+            for(int ii = block_size-1; ii > i; ii--){
+                mult &= spk_group[ii];
             }
-	  sum |= mult;
+            sum |= mult;
         }
-      sgk[k] = sum;
+        sgk[k] = sum;
 
-      int mult = spk_group[0];
-      for(int i = 1; i < block_size; i++)
-        {
-	  mult &= spk_group[i];
+        int mult = spk_group[0];
+        for(int i = 1; i < block_size; i++){
+            mult &= spk_group[i];
         }
-      spk[k] = mult;
+        spk[k] = mult;
 
-      // free from grab_slice allocation
-      free(sgk_group);
-      free(spk_group);
+        // free from grab_slice allocation
+        free(sgk_group);
+        free(spk_group);
     }
 }
 
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+template <int blockSize>
+__global__ void compute_super_section_gp_c(int* ssgl_c, int* sspl_c, int* sgk_c, int* spk_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index < 1025){
+        int lstart = index * blockSize;
+        int sum = 0;
+        for(int i = 0; i < blockSize; i++){
+            int mult = sgk_c[lstart + i];
+            for(int ii = blockSize-1; ii > i; ii--){
+                mult &= spk_c[lstart + ii];
+            }
+            sum |= mult;
+        }
+        ssgl_c[index] = sum;
+
+        int mult = spk_c[lstart];
+        for(int i = 1; i < blockSize; i++){
+            mult &= spk_c[lstart + 1];
+        }
+        sspl_c[index] = mult;
+    }
+}
+
 
 void compute_super_section_gp()
 {
@@ -233,6 +275,29 @@ void compute_super_section_gp()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+
+template <int blockSize>
+__global__ void compute_super_super_section_cp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index < 33){
+        int mstart = index * blockSize;
+        int sum = 0;
+        for(int i = 0; i < blockSize; i++){
+            int mult = ssgl_c[mstart + i];
+            for(int ii = blockSize-1; ii > i; ii--){
+                mult &= sspl_c[mstart + ii];
+            }
+            sum |= mult;
+        }
+        sssgm_c[index] = sum;
+
+        int mult = sspl_c[mstart];
+        for(int i = 1; i < blockSize; i++){
+            mult &= sspl_c[mstart + 1];
+        }
+        ssspm_c[index] = mult;
+    }
+}
 
 void compute_super_super_section_gp()
 {
@@ -428,41 +493,37 @@ void cla()
     cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
     cudaMallocManaged(&gpj_cuda, ngroups*sizeof(int));
 
-    for(int i = 0; i < ngroups; i++){
-        ggj_cuda[i] = 10;
-        gpj_cuda[i] = 10;
-    }
-
     compute_group_gp_c<block_size><<<(ngroups + 256 -1)/256, 256>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
 
-    compute_gp();
-    compute_group_gp();
+    int* sgk_cuda, *spk_cuda;
+    cudaMallocManaged(&sgk_cuda, nsections*sizeof(int));
+    cudaMallocManaged(&spk_cuda, nsections*sizeof(int));
+
+    compute_section_gp_c<block_size><<<(nsections + 256 -1)/256, 256>>>(sgk_cuda, spk_cuda, ggj_cuda, gpj_cuda);
+
+    int* ssgl_cuda, *sspl_cuda;
+    cudaMallocManaged(&ssgl_cuda, nsupersections*sizeof(int));
+    cudaMallocManaged(&sspl_cuda, nsupersections*sizeof(int));
+
+    compute_super_section_gp_c<block_size><<<(nsupersections + 256 -1)/256, 256>>>(ssgl_cuda, sspl_cuda, sgk_cuda, spk_cuda);
+
+    int* sssgm_cuda, *ssspm_cuda;
+    cudaMallocManaged(&sssgm_cuda, nsupersupersections*sizeof(int));
+    cudaMallocManaged(&ssspm_cuda, nsupersupersections*sizeof(int));
+
+    compute_super_section_gp_c<block_size><<<(nsupersupersections + 256 -1)/256, 256>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
+
+    compute_gp(); //p
+    compute_group_gp(); //p
+    compute_section_gp(); //p
+    compute_super_section_gp(); //p
+    compute_super_super_section_gp(); //p
 
     int count = 0;
-    int count3 = 0;
-    for(int i = 0; i < ngroups; i++){
-        if(ggj_cuda[i] != ggj[i]){
-            count++;
-        }
-        if(ggj_cuda[i] == 10){
-            count3++;
-        }
-    }
-    int count2 = 0;
-    int count3 = 0;
-    for(int i = 0; i < ngroups; i++){
-        if(gpj_cuda[i] != gpj[i]){
-            count2++;
-        }
-        if(gpj_cuda[i] == 10){
-            count4++;
-        }
-    }
-    printf("%d %d %d %d\n", count, count2, count3, count4);
+    for(int i = 0; i < nsupersupersections; i++)
+        if(sssgm_cuda[i] != sssgm[i]) count++;
+    printf("%d \n", count);
 
-    compute_section_gp();
-    compute_super_section_gp();
-    compute_super_super_section_gp();
     compute_super_super_section_carry();
     compute_super_section_carry();
     compute_section_carry();
