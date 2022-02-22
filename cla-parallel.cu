@@ -230,7 +230,7 @@ __global__
 void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index == 0){
-        gcj_c[0] = ggc_c[0] | 0;
+        gcj_c[0] = ggj_c[0] | 0;
     }
     if(threadIdx.x < nsections){
         if(index != 0)
