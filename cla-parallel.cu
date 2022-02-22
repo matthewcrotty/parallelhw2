@@ -672,9 +672,13 @@ void cla()
         }
     printf("%d\n", count4);
 
+    cudaDeviceSynchronize();
+
     for(int i = 0; i < bits; i++){
         sumi[i] = sumi_cuda[i];
     }
+
+    cudaDeviceSynchronize();
   /***********************************************************************************************************/
   // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
   /***********************************************************************************************************/
