@@ -52,6 +52,8 @@ int* bin2=NULL;
 char* hex1=NULL;
 char* hex2=NULL;
 
+int* sumi_cuda;
+
 void read_input()
 {
   char* in1 = (char *)calloc(input_size+1, sizeof(char));
@@ -79,7 +81,8 @@ void read_input()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
-__global__ void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
+__global__
+void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < bits){
         gi_c[index] = bin1_c[index] & bin2_c[index];
@@ -99,7 +102,8 @@ void compute_gp()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
-__global__ void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
+__global__
+void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < ngroups){
         int jstart = index * block_size;
@@ -159,7 +163,8 @@ void compute_group_gp()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
-__global__ void compute_section_gp_c(int* sgk_c, int* spk_c, int* ggj_c, int* gpj_c){
+__global__
+void compute_section_gp_c(int* sgk_c, int* spk_c, int* ggj_c, int* gpj_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < nsections){
         int kstart = index * block_size;
@@ -215,7 +220,8 @@ void compute_section_gp()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
-__global__ void compute_super_section_gp_c(int* ssgl_c, int* sspl_c, int* sgk_c, int* spk_c){
+__global__
+void compute_super_section_gp_c(int* ssgl_c, int* sspl_c, int* sgk_c, int* spk_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < nsupersections){
         int lstart = index * block_size;
@@ -276,7 +282,8 @@ void compute_super_section_gp()
 /***********************************************************************************************************/
 
 
-__global__ void compute_super_super_section_gp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
+__global__
+void compute_super_super_section_gp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index < nsupersupersections){
         int mstart = index * block_size;
@@ -371,7 +378,8 @@ void compute_super_super_section_carry()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
-__global__ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* ssscm_c){
+__global__
+void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* ssscm_c){
     if(threadIdx.x < nsupersupersections){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
@@ -405,7 +413,8 @@ void compute_super_section_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
-__global__ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
+__global__
+void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
     if(threadIdx.x < nsupersections){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
@@ -440,8 +449,8 @@ void compute_section_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
-
-__global__ void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
+__global__
+void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
     if(threadIdx.x < nsections){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
@@ -475,9 +484,8 @@ void compute_group_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
-
-
-__global__ void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
+__global__
+void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
     if(threadIdx.x < ngroups){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index]);
@@ -511,6 +519,13 @@ void compute_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+__global__
+void compute_sum_c(int* sumi_c, int* bin1_c, int* bin2_c, int* ci_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index != 0){
+        sumi_c[index] = bin1_c[index] ^ bin2_c[index] ^ ci_c[index - 1];
+    }
+}
 
 
 void compute_sum()
@@ -547,37 +562,37 @@ void cla()
         bin2_cuda[i] = bin2[i];
     }
 
-    //int block_size = 256;
-    //int numBlocks = (bits + block_size -1)/ block_size;
+    int blockSize = 256;
+
     int* gi_cuda, *pi_cuda;
     cudaMallocManaged(&gi_cuda, bits*sizeof(int));
     cudaMallocManaged(&pi_cuda, bits*sizeof(int));
 
-    compute_gp_c<<<(bits + 256 -1)/256, 256>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    compute_gp_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
 
     int* ggj_cuda, *gpj_cuda;
     cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
     cudaMallocManaged(&gpj_cuda, ngroups*sizeof(int));
 
-    compute_group_gp_c<<<(ngroups + 256 -1)/256, 256>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
+    compute_group_gp_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
 
     int* sgk_cuda, *spk_cuda;
     cudaMallocManaged(&sgk_cuda, nsections*sizeof(int));
     cudaMallocManaged(&spk_cuda, nsections*sizeof(int));
 
-    compute_section_gp_c<<<(nsections + 256 -1)/256, 256>>>(sgk_cuda, spk_cuda, ggj_cuda, gpj_cuda);
+    compute_section_gp_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(sgk_cuda, spk_cuda, ggj_cuda, gpj_cuda);
 
     int* ssgl_cuda, *sspl_cuda;
     cudaMallocManaged(&ssgl_cuda, nsupersections*sizeof(int));
     cudaMallocManaged(&sspl_cuda, nsupersections*sizeof(int));
 
-    compute_super_section_gp_c<<<(nsupersections + 256 -1)/256, 256>>>(ssgl_cuda, sspl_cuda, sgk_cuda, spk_cuda);
+    compute_super_section_gp_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(ssgl_cuda, sspl_cuda, sgk_cuda, spk_cuda);
 
     int* sssgm_cuda, *ssspm_cuda;
     cudaMallocManaged(&sssgm_cuda, nsupersupersections*sizeof(int));
     cudaMallocManaged(&ssspm_cuda, nsupersupersections*sizeof(int));
 
-    compute_super_super_section_gp_c<<<(nsupersupersections + 256 -1)/256, 256>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
+    compute_super_super_section_gp_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
 
     int* ssscm_cuda;
     cudaMallocManaged(&ssscm_cuda, nsupersupersections*sizeof(int));
@@ -585,19 +600,27 @@ void cla()
 
     int* sscl_cuda;
     cudaMallocManaged(&sscl_cuda, nsupersections*sizeof(int));
-    compute_super_section_carry_c<<<(nsupersupersections + 256 -1)/256, 256>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
+    compute_super_section_carry_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
 
     int* sck_cuda;
     cudaMallocManaged(&sck_cuda, nsections*sizeof(int));
-    compute_section_carry_c<<<(nsupersections + 256 -1)/256, 256>>>(sck_cuda, sgk_cuda, spk_cuda, sscl_cuda);
+    compute_section_carry_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(sck_cuda, sgk_cuda, spk_cuda, sscl_cuda);
 
     int* gcj_cuda;
     cudaMallocManaged(&gcj_cuda, ngroups*sizeof(int));
-    compute_group_carry_c<<<(nsections + 256 -1)/256, 256>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
+    compute_group_carry_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
 
     int* ci_cuda;
     cudaMallocManaged(&ci_cuda, bits*sizeof(int));
-    compute_carry_c<<<(ngroups + 256 -1)/256, 256>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
+    compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
+
+
+    cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
+    compute_sum_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(sumi_cuda, bin1_cuda, bin2_cuda, ci_cuda);
+
+    cudaDeviceSynchronize();
+
+    sumi_cuda[0] = bin1_cuda[0] ^ bin2_cuda[0] ^ 0;
 
     compute_gp(); //p
     compute_group_gp(); //p
@@ -648,7 +671,7 @@ void cla()
   /***********************************************************************************************************/
   // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
   /***********************************************************************************************************/
-  cudaDeviceSynchronize();
+
 
   cudaFree(bin1_cuda);
   cudaFree(bin2_cuda);
@@ -666,7 +689,7 @@ void cla()
   cudaFree(sscl_cuda);
   cudaFree(sck_cuda);
   cudaFree(gcj_cuda);
-
+  cudaFree(ci_cuda);
 
 }
 
@@ -756,7 +779,7 @@ int main(int argc, char *argv[])
 
   if( verbose==1 )
     {
-      int2str_result = int_to_string(sumi,bits);
+      int2str_result = int_to_string(sumi_cuda,bits);
       hexSum = revbinary_to_hex( int2str_result,bits);
     }
 
