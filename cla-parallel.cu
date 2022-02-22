@@ -198,7 +198,6 @@ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* s
     if(threadIdx.x < nsupersupersections){
         if(index != 0)
             sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
-        __syncthreads();
         index *= block_size;
         for(int l = 1; l < block_size; l++){
             if(index + l < nsupersections){
@@ -218,7 +217,6 @@ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
     if(threadIdx.x < nsupersections){
         if(index != 0)
             sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
-        __syncthreads();
         index *= block_size;
         for(int k = 1; k < block_size; k++){
             if(index + k < nsections){
@@ -238,7 +236,6 @@ void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
     if(threadIdx.x < nsections){
         if(index != 0)
             gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
-        __syncthreads();
         index *= block_size;
         for(int j = 1; j < block_size; j++){
             if(index + j < ngroups){
@@ -258,7 +255,6 @@ void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
     if(threadIdx.x < ngroups){
         if(index != 0)
             ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index-1]);
-        __syncthreads();
         index *= block_size;
         for(int i = 1; i < block_size; i++){
             if(index + i < bits){
