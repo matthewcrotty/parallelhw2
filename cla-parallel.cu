@@ -666,6 +666,12 @@ void cla()
         }
     printf("%d\n", count3);
     compute_sum();
+    int count4 = 0;
+    for(int i = 0; i < bits; i++)
+        if(sumi_cuda[i] != sumi[i]){
+            count4++;
+        }
+    printf("%d\n", count4);
 
 
   /***********************************************************************************************************/
