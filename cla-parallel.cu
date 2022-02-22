@@ -372,15 +372,16 @@ void compute_super_super_section_carry()
 /***********************************************************************************************************/
 
 __global__ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* ssscm_c){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
-    index *= block_size;
-    for(int l = 1; l < block_size; l++){
-        if(index + l < nsupersections){
-            sscl_c[index + l] = ssgl_c[index + l] | (sspl_c[index + l] & sscl_c[index + l -1]);
+    if(threadIdx.x < nsupersupersections){
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+        sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
+        index *= block_size;
+        for(int l = 1; l < block_size; l++){
+            if(index + l < nsupersections){
+                sscl_c[index + l] = ssgl_c[index + l] | (sspl_c[index + l] & sscl_c[index + l -1]);
+            }
         }
     }
-
 }
 
 void compute_super_section_carry()
@@ -405,12 +406,14 @@ void compute_super_section_carry()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 __global__ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
-    index *= block_size;
-    for(int k = 1; k < block_size; k++){
-        if(index + k < nsections){
-            sck_c[index + k] = sgk_c[index + k] | (spk_c[index + k] & sck_c[index + k - 1]);
+    if(threadIdx.x < nsupersections){
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+        sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
+        index *= block_size;
+        for(int k = 1; k < block_size; k++){
+            if(index + k < nsections){
+                sck_c[index + k] = sgk_c[index + k] | (spk_c[index + k] & sck_c[index + k - 1]);
+            }
         }
     }
 }
