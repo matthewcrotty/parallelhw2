@@ -601,15 +601,34 @@ void cla()
     compute_super_super_section_gp(); //p
     compute_super_super_section_carry(); //p?
     compute_super_section_carry(); //p
-    compute_section_carry(); //p
-    compute_group_carry(); //p
-    compute_carry(); //p
     int count = 0;
     for(int i = 0; i < nsupersections; i++)
-        if(ci_cuda[i] != ci[i]){
+        if(sscl_cuda[i] != sscl[i]){
             count++;
         }
     printf("%d\n", count);
+
+    compute_section_carry(); //p
+    int count1 = 0;
+    for(int i = 0; i < nsections; i++)
+        if(sck_cuda[i] != sck[i]){
+            count1++;
+        }
+    printf("%d\n", count1);
+    compute_group_carry(); //p
+    int count2 = 0;
+    for(int i = 0; i < ngroups; i++)
+        if(gcj_cuda[i] != gcj[i]){
+            count2++;
+        }
+    printf("%d\n", count2);
+    compute_carry(); //p
+    int count3 = 0;
+    for(int i = 0; i < bits; i++)
+        if(ci_cuda[i] != ci[i]){
+            count3++;
+        }
+    printf("%d\n", count3);
     compute_sum();
 
 
