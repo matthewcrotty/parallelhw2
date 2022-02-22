@@ -19,6 +19,9 @@
 #define nsupersections nsections/block_size
 #define nsupersupersections nsupersections/block_size
 
+// CUDA block size
+int blockSize = 512;
+
 //Global definitions of the various arrays used in steps for easy access
 int gi[bits] = {0};
 int pi[bits] = {0};
@@ -287,8 +290,6 @@ void cla()
         bin1_cuda[i] = bin1[i];
         bin2_cuda[i] = bin2[i];
     }
-
-    int blockSize = 256;
 
     // Call all kernels, allocating arrays as needed
 
