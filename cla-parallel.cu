@@ -412,7 +412,7 @@ __global__ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int*
     index *= blockSize;
     for(int k = 1; k < blockSize; k++){
         if(index + k < 32769){
-            sck_c[index + k] = sgk_c[index] | (spk_c[index + k] & sck_c[index + k - 1]);
+            sck_c[index + k] = sgk_c[index + k] | (spk_c[index + k] & sck_c[index + k - 1]);
         }
     }
 }
