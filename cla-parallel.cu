@@ -522,7 +522,8 @@ __global__
 void compute_sum_c(int* sumi_c, int* bin1_c, int* bin2_c, int* ci_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if(index != 0){
-        sumi_c[index] = bin1_c[index] ^ bin2_c[index] ^ ci_c[index - 1];
+        if(index < bits)
+            sumi_c[index] = bin1_c[index] ^ bin2_c[index] ^ ci_c[index - 1];
     }
 }
 
