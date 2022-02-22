@@ -442,12 +442,14 @@ void compute_section_carry()
 /***********************************************************************************************************/
 
 __global__ void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
-    index *= block_size;
-    for(int j = 1; j < block_size; j++){
-        if(index + j < ngroups){
-            gcj_c[index + j] = ggj_c[index + j] | (gpj_c[index + j] & gcj_c[index+j -1]);
+    if(threadIdx.x < nsections){
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+        gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
+        index *= block_size;
+        for(int j = 1; j < block_size; j++){
+            if(index + j < ngroups){
+                gcj_c[index + j] = ggj_c[index + j] | (gpj_c[index + j] & gcj_c[index+j -1]);
+            }
         }
     }
 }
@@ -476,12 +478,14 @@ void compute_group_carry()
 
 
 __global__ void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index]);
-    index *= block_size;
-    for(int i = 1; i < block_size; i++){
-        if(index + i < bits){
-            ci_c[index + i] = gi_c[index + i] | (pi_c[index + i] & ci_c[index+i -1]);
+    if(threadIdx.x < ngroups)
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+        ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index]);
+        index *= block_size;
+        for(int i = 1; i < block_size; i++){
+            if(index + i < bits){
+                ci_c[index + i] = gi_c[index + i] | (pi_c[index + i] & ci_c[index+i -1]);
+            }
         }
     }
 }
