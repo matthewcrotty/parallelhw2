@@ -625,11 +625,11 @@ void cla()
     compute_gp(); //p
     compute_group_gp(); //p
     int gcount = 0;
-    for(int i = 0; i < ngroups; i++)
+    for(int i = 0; i < bits; i++)
         if(gi_cuda[i] != gi[i]) gcount++;
     printf("%d\n", gcount);
     int pcount = 0;
-    for(int i = 0; i < ngroups; i++)
+    for(int i = 0; i < bits; i++)
         if(pi_cuda[i] != pi[i]) pcount++;
     printf("%d\n", pcount);
     compute_section_gp(); //p
