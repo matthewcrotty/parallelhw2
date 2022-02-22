@@ -31,6 +31,19 @@ int sumi[bits] = {0};
 
 int sumrca[bits] = {0};
 
+// Global definitions of CUDA vars
+int* gi_cuda, *pi_cuda;
+int* ggj_cuda, *gpj_cuda;
+int* sgk_cuda, *spk_cuda;
+int* ssgl_cuda, *sspl_cuda;
+int* sssgm_cuda, *ssspm_cuda;
+int* ssscm_cuda;
+int* sscl_cuda;
+int* sck_cuda;
+int* gcj_cuda;
+int* sumi_cuda;
+int* ci_cuda;
+
 //Integer array of inputs in binary form
 int* bin1=NULL;
 int* bin2=NULL;
@@ -275,80 +288,27 @@ void compute_sum_c(int* sumi_c, int* bin1_c, int* bin2_c, int* ci_c){
             sumi_c[index] = bin1_c[index] ^ bin2_c[index] ^ ci_c[index - 1];
     }
 }
-
-void cla()
-{
-
-    // Malloc bin1 and bin2 so GPU can read, and copy data over.
-
-
-    // Call all kernels, allocating arrays as needed
-
-    int* gi_cuda, *pi_cuda;
+void malloc_all_cuda(){
     cudaMallocManaged(&gi_cuda, bits*sizeof(int));
     cudaMallocManaged(&pi_cuda, bits*sizeof(int));
-
-    compute_gp_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
-
-    int* ggj_cuda, *gpj_cuda;
     cudaMallocManaged(&ggj_cuda, ngroups*sizeof(int));
     cudaMallocManaged(&gpj_cuda, ngroups*sizeof(int));
-
-    compute_group_gp_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
-
-    int* sgk_cuda, *spk_cuda;
     cudaMallocManaged(&sgk_cuda, nsections*sizeof(int));
     cudaMallocManaged(&spk_cuda, nsections*sizeof(int));
-
-    compute_section_gp_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(sgk_cuda, spk_cuda, ggj_cuda, gpj_cuda);
-
-    int* ssgl_cuda, *sspl_cuda;
     cudaMallocManaged(&ssgl_cuda, nsupersections*sizeof(int));
     cudaMallocManaged(&sspl_cuda, nsupersections*sizeof(int));
-
-    compute_super_section_gp_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(ssgl_cuda, sspl_cuda, sgk_cuda, spk_cuda);
-
-    int* sssgm_cuda, *ssspm_cuda;
     cudaMallocManaged(&sssgm_cuda, nsupersupersections*sizeof(int));
     cudaMallocManaged(&ssspm_cuda, nsupersupersections*sizeof(int));
-
-    compute_super_super_section_gp_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
-
-    int* ssscm_cuda;
     cudaMallocManaged(&ssscm_cuda, nsupersupersections*sizeof(int));
-    compute_super_super_section_carry_c(ssscm_cuda, sssgm_cuda, ssspm_cuda);
-
-    int* sscl_cuda;
     cudaMallocManaged(&sscl_cuda, nsupersections*sizeof(int));
-    compute_super_section_carry_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
-
-    int* sck_cuda;
     cudaMallocManaged(&sck_cuda, nsections*sizeof(int));
-    compute_section_carry_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(sck_cuda, sgk_cuda, spk_cuda, sscl_cuda);
-
-    int* gcj_cuda;
     cudaMallocManaged(&gcj_cuda, ngroups*sizeof(int));
-    compute_group_carry_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
-
-    int* ci_cuda;
     cudaMallocManaged(&ci_cuda, bits*sizeof(int));
-    compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
-
-    int* sumi_cuda;
     cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
-    compute_sum_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(sumi_cuda, bin1_cuda, bin2_cuda, ci_cuda);
 
+}
 
-    // Synchronize and copy result into sumi from sumi_c
-    cudaDeviceSynchronize();
-
-    sumi_cuda[0] = bin1_cuda[0] ^ bin2_cuda[0] ^ 0;
-
-    for(int i = 0; i < bits; i++){
-        sumi[i] = sumi_cuda[i];
-    }
-
-    // Free all cuda malloc'd memory.
+void free_all_cuda(){
     cudaFree(bin1_cuda);
     cudaFree(bin2_cuda);
     cudaFree(gi_cuda);
@@ -367,6 +327,30 @@ void cla()
     cudaFree(gcj_cuda);
     cudaFree(ci_cuda);
     cudaFree(sumi_cuda);
+}
+void cla()
+{
+    // Call all kernels,
+    compute_gp_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(gi_cuda, pi_cuda, bin1_cuda, bin2_cuda);
+    compute_group_gp_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ggj_cuda, gpj_cuda, gi_cuda, pi_cuda);
+    compute_section_gp_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(sgk_cuda, spk_cuda, ggj_cuda, gpj_cuda);
+    compute_super_section_gp_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(ssgl_cuda, sspl_cuda, sgk_cuda, spk_cuda);
+    compute_super_super_section_gp_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sssgm_cuda, ssspm_cuda, ssgl_cuda, sspl_cuda);
+
+    compute_super_super_section_carry_c(ssscm_cuda, sssgm_cuda, ssspm_cuda);
+
+    compute_super_section_carry_c<<<(nsupersupersections + blockSize -1)/blockSize, blockSize>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
+    compute_section_carry_c<<<(nsupersections + blockSize -1)/blockSize, blockSize>>>(sck_cuda, sgk_cuda, spk_cuda, sscl_cuda);
+    compute_group_carry_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
+    compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
+
+    compute_sum_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(sumi_cuda, bin1_cuda, bin2_cuda, ci_cuda);
+
+    // Synchronize and copy result into sumi from sumi_c
+    cudaDeviceSynchronize();
+
+    sumi_cuda[0] = bin1_cuda[0] ^ bin2_cuda[0] ^ 0;
+
 }
 
 void ripple_carry_adder()
@@ -440,6 +424,7 @@ int main(int argc, char *argv[])
   bin2 = gen_formated_binary_from_hex(hexb);
 
 
+  // Malloc bin1 and bin2 into cuda memory, so GPU can read and copy data over.
   cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
   cudaMallocManaged(&bin2_cuda, bits*sizeof(int));
 
@@ -448,16 +433,25 @@ int main(int argc, char *argv[])
       bin2_cuda[i] = bin2[i];
   }
 
+  malloc_all_cuda();
 
   start_time = clock_now();
   cla();
   end_time = clock_now();
+
+  // Copy bits out of cuda array (to not change test function)
+  for(int i = 0; i < bits; i++){
+      sumi[i] = sumi_cuda[i];
+  }
+
 
   printf("CLA Completed in %llu cycles\n", (end_time - start_time));
 
   start_time = clock_now();
   ripple_carry_adder();
   end_time = clock_now();
+
+  free_all_cuda();
 
   printf("RCA Completed in %llu cycles\n", (end_time - start_time));
 
