@@ -610,13 +610,9 @@ void cla()
     cudaMallocManaged(&gcj_cuda, ngroups*sizeof(int));
     compute_group_carry_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
 
-    cudaDeviceSynchronize();
-
     int* ci_cuda;
     cudaMallocManaged(&ci_cuda, bits*sizeof(int));
     compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
-
-    cudaDeviceSynchronize();
 
     int* sumi_cuda;
     cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
@@ -626,56 +622,56 @@ void cla()
 
     sumi_cuda[0] = bin1_cuda[0] ^ bin2_cuda[0] ^ 0;
 
-    // compute_gp(); //p
-    // compute_group_gp(); //p
-    // int gcount = 0;
-    // for(int i = 0; i < ngroups; i++)
-    //     if(gi_cuda[i] != gi[i]) gcount++;
-    // printf("%d\n", gcount);
-    // int pcount = 0;
-    // for(int i = 0; i < ngroups; i++)
-    //     if(pi_cuda[i] != pi[i]) pcount++;
-    // printf("%d\n", pcount);
-    // compute_section_gp(); //p
-    // compute_super_section_gp(); //p
-    // compute_super_super_section_gp(); //p
-    // compute_super_super_section_carry(); //p?
-    // compute_super_section_carry(); //p
-    // int count = 0;
-    // for(int i = 0; i < nsupersections; i++)
-    //     if(sscl_cuda[i] != sscl[i]){
-    //         count++;
-    //     }
-    // printf("%d\n", count);
-    //
-    // compute_section_carry(); //p
-    // int count1 = 0;
-    // for(int i = 0; i < nsections; i++)
-    //     if(sck_cuda[i] != sck[i]){
-    //         count1++;
-    //     }
-    // printf("%d\n", count1);
-    // compute_group_carry(); //p
-    // int count2 = 0;
-    // for(int i = 0; i < ngroups; i++)
-    //     if(gcj_cuda[i] != gcj[i]){
-    //         count2++;
-    //     }
-    // printf("%d\n", count2);
-    // compute_carry(); //p
-    // int count3 = 0;
-    // for(int i = 0; i < bits; i++)
-    //     if(ci_cuda[i] != ci[i]){
-    //         count3++;
-    //     }
-    // printf("%d\n", count3);
-    // compute_sum();
-    // int count4 = 0;
-    // for(int i = 0; i < bits; i++)
-    //     if(sumi_cuda[i] != sumi[i]){
-    //         count4++;
-    //     }
-    // printf("%d\n", count4);
+    compute_gp(); //p
+    compute_group_gp(); //p
+    int gcount = 0;
+    for(int i = 0; i < ngroups; i++)
+        if(gi_cuda[i] != gi[i]) gcount++;
+    printf("%d\n", gcount);
+    int pcount = 0;
+    for(int i = 0; i < ngroups; i++)
+        if(pi_cuda[i] != pi[i]) pcount++;
+    printf("%d\n", pcount);
+    compute_section_gp(); //p
+    compute_super_section_gp(); //p
+    compute_super_super_section_gp(); //p
+    compute_super_super_section_carry(); //p?
+    compute_super_section_carry(); //p
+    int count = 0;
+    for(int i = 0; i < nsupersections; i++)
+        if(sscl_cuda[i] != sscl[i]){
+            count++;
+        }
+    printf("%d\n", count);
+
+    compute_section_carry(); //p
+    int count1 = 0;
+    for(int i = 0; i < nsections; i++)
+        if(sck_cuda[i] != sck[i]){
+            count1++;
+        }
+    printf("%d\n", count1);
+    compute_group_carry(); //p
+    int count2 = 0;
+    for(int i = 0; i < ngroups; i++)
+        if(gcj_cuda[i] != gcj[i]){
+            count2++;
+        }
+    printf("%d\n", count2);
+    compute_carry(); //p
+    int count3 = 0;
+    for(int i = 0; i < bits; i++)
+        if(ci_cuda[i] != ci[i]){
+            count3++;
+        }
+    printf("%d\n", count3);
+    compute_sum();
+    int count4 = 0;
+    for(int i = 0; i < bits; i++)
+        if(sumi_cuda[i] != sumi[i]){
+            count4++;
+        }
+    printf("%d\n", count4);
 
     // cudaDeviceSynchronize();
 
