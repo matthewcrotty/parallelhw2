@@ -487,13 +487,15 @@ __global__
 void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
     if(threadIdx.x < ngroups){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
-        ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index]);
+        ci_c[index * block_size] = gi_c[index * block_size];
         index *= block_size;
-        for(int i = 1; i < block_size; i++){
+        for(int i = 1; i < block_size -1; i++){
             if(index + i < bits){
                 ci_c[index + i] = gi_c[index + i] | (pi_c[index + i] & ci_c[index+i -1]);
             }
         }
+        index += block_size;
+        ci_c[index * block_size] = gi_c[index * block_size] | (pi_c[index * block_size] & gcj_c[index]);
     }
 }
 
