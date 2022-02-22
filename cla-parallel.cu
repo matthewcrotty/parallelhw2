@@ -81,7 +81,7 @@ void read_input()
 template <int numBits>
 __global__ void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if(index < numBits){ //hard coded number of bits.
+    if(index < numBits){
         gi_c[index] = bin1_c[index] & bin2_c[index];
         pi_c[index] = bin1_c[index] | bin2_c[index];
     }
@@ -336,7 +336,7 @@ void compute_super_super_section_gp()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
-// I dont think this one can be parellilized.
+// I dont think this one can be parelellized.
 void compute_super_super_section_carry_c(int* ssscm_c, int* sssgm_c, int* ssspm_c, int n){
     for(int m = 0; m < n; m++){
         int ssscmlast = 0;
@@ -383,6 +383,7 @@ __global__ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* ssp
     }
 
 }
+
 void compute_super_section_carry()
 {
   for(int l = 0; l < nsupersections; l++)
@@ -404,6 +405,17 @@ void compute_super_section_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+template <int blockSize>
+__global__ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    sck_c[index * blockSize] = sgk_c[index * blockSize] | (spk_c[index * blockSize] & sscl_c[index]);
+    index *= blockSize;
+    for(int k = 1; k < blockSize; k++){
+        if(index + k < 32769){
+            sck_c[index + k] = sgk_c[index] | (spk_c[index + k] & sck_c[index + k - 1]);
+        }
+    }
+}
 
 void compute_section_carry()
 {
@@ -427,6 +439,17 @@ void compute_section_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+template <int blockSize>
+__global__ void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    gcj_c[index * blockSize] = ggj_c[index * blockSize] | (gpj_c[index * blockSize] & sck_c[index]);
+    index *= blockSize;
+    for(int j = 1; j < blockSize; j++){
+        if(index + j < 1048577){
+            gcj_c[index + j] = ggj_c[index + j] | (gpj_c[index + j] & gcj_c[index+j -1]);
+        }
+    }
+}
 
 void compute_group_carry()
 {
@@ -450,6 +473,18 @@ void compute_group_carry()
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
 
+template <int blockSize>
+__global__ void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    ci_c[index * blockSize] = gi_c[index * blockSize] | (pi_c[index * blockSize] & gcj_c[index]);
+    index *= blockSize;
+    for(int i = 1; i < blockSize; i++){
+        if(index + i < 8388608){
+            ci_c[index + i] = gi_c[index + i] | (pi_c[index + i] & ci_c[index+i -1]);
+        }
+    }
+}
+
 void compute_carry()
 {
   for(int i = 0; i < bits; i++)
@@ -471,6 +506,7 @@ void compute_carry()
 /***********************************************************************************************************/
 // ADAPT AS CUDA KERNEL
 /***********************************************************************************************************/
+
 
 void compute_sum()
 {
@@ -546,6 +582,18 @@ void cla()
     cudaMallocManaged(&sscl_cuda, nsupersections*sizeof(int));
     compute_super_section_carry_c<block_size><<<(nsupersupersections + 256 -1)/256, 256>>>(sscl_cuda, ssgl_cuda, sspl_cuda, ssscm_cuda);
 
+    int* sck_cuda;
+    cudaMallocManaged(&sck_cuda, nsections*sizeof(int));
+    compute_section_carry_c<block_size><<<(nsupersections + 256 -1)/256, 256>>>(sck_cuda, sgk_cuda, spk_cuda, sscl_cuda);
+
+    int* gcj_cuda;
+    cudaMallocManaged(&gcj_cuda, ngroups*sizeof(int));
+    compute_group_carry_c<block_size><<<(nsections + 256 -1)/256, 256>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
+
+    int* ci_cuda;
+    cudaMallocManaged(&ci_cuda, bits*sizeof(int));
+    compute_carry_c<block_size><<<(ngroups + 256 -1)/256, 256>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
+
     compute_gp(); //p
     compute_group_gp(); //p
     compute_section_gp(); //p
@@ -553,17 +601,15 @@ void cla()
     compute_super_super_section_gp(); //p
     compute_super_super_section_carry(); //p?
     compute_super_section_carry(); //p
-
+    compute_section_carry(); //p
+    compute_group_carry(); //p
+    compute_carry(); //p
     int count = 0;
     for(int i = 0; i < nsupersections; i++)
-        if(sscl_cuda[i] != sscl[i]){
+        if(ci_cuda[i] != ci[i]){
             count++;
         }
     printf("%d\n", count);
-    
-    compute_section_carry();
-    compute_group_carry();
-    compute_carry();
     compute_sum();
 
 
@@ -584,6 +630,10 @@ void cla()
   cudaFree(sspl_cuda);
   cudaFree(sssgm_cuda);
   cudaFree(ssspm_cuda);
+  cudaFree(ssscm_cuda);
+  cudaFree(sscl_cuda);
+  cudaFree(sck_cuda);
+  cudaFree(gcj_cuda);
 
 
 }
