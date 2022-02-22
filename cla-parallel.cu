@@ -610,9 +610,13 @@ void cla()
     cudaMallocManaged(&gcj_cuda, ngroups*sizeof(int));
     compute_group_carry_c<<<(nsections + blockSize -1)/blockSize, blockSize>>>(gcj_cuda, ggj_cuda, gpj_cuda, sck_cuda);
 
+    cudaDeviceSynchronize();
+
     int* ci_cuda;
     cudaMallocManaged(&ci_cuda, bits*sizeof(int));
     compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
+
+    cudaDeviceSynchronize();
 
     int* sumi_cuda;
     cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
