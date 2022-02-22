@@ -39,6 +39,8 @@ int* bin2=NULL;
 char* hex1=NULL;
 char* hex2=NULL;
 
+int* bin1_cuda, *bin2_cuda;
+
 
 void read_input()
 {
@@ -278,14 +280,7 @@ void cla()
 {
 
     // Malloc bin1 and bin2 so GPU can read, and copy data over.
-    int* bin1_cuda, *bin2_cuda;
-    cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
-    cudaMallocManaged(&bin2_cuda, bits*sizeof(int));
 
-    for(int i = 0; i < bits; i++){
-        bin1_cuda[i] = bin1[i];
-        bin2_cuda[i] = bin2[i];
-    }
 
     // Call all kernels, allocating arrays as needed
 
@@ -443,6 +438,16 @@ int main(int argc, char *argv[])
 
   bin1 = gen_formated_binary_from_hex(hexa);
   bin2 = gen_formated_binary_from_hex(hexb);
+
+
+  cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
+  cudaMallocManaged(&bin2_cuda, bits*sizeof(int));
+
+  for(int i = 0; i < bits; i++){
+      bin1_cuda[i] = bin1[i];
+      bin2_cuda[i] = bin2[i];
+  }
+
 
   start_time = clock_now();
   cla();
