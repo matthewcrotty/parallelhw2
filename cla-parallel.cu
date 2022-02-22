@@ -60,10 +60,7 @@ void read_input()
   free(in2);
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
+// Unrolled loop, each thread gets 1 bit.
 __global__
 void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -73,9 +70,8 @@ void compute_gp_c(int* gi_c, int* pi_c, int* bin1_c, int* bin2_c){
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
+// Unrolled loop, each thread gets 1 bit of ngroups, which reads a block_size
+// chunk from gi and pi.
 __global__
 void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -100,11 +96,8 @@ void compute_group_gp_c(int* ggj_c, int* gpj_c, int* gi_c, int* pi_c){
 
 }
 
-
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
+// Unrolled loop, each thread gets 1 bit of nsections, which reads a block_size
+// chunk from ggj and gpj
 __global__
 void compute_section_gp_c(int* sgk_c, int* spk_c, int* ggj_c, int* gpj_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -128,10 +121,8 @@ void compute_section_gp_c(int* sgk_c, int* spk_c, int* ggj_c, int* gpj_c){
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
+// Unrolled loop, each thread gets 1 bit of nsupersections, which reads a block_size
+// chunk from sgk and spk
 __global__
 void compute_super_section_gp_c(int* ssgl_c, int* sspl_c, int* sgk_c, int* spk_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -155,11 +146,8 @@ void compute_super_section_gp_c(int* ssgl_c, int* sspl_c, int* sgk_c, int* spk_c
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
-
+// Unrolled loop, each thread gets 1 bit of nsupersupersections, which reads a block_size
+// chunk from ssgl and sspl
 __global__
 void compute_super_super_section_gp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, int* sspl_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -183,10 +171,6 @@ void compute_super_super_section_gp_c(int* sssgm_c, int* ssspm_c, int* ssgl_c, i
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
 // I dont think this one can be parelellized.
 void compute_super_super_section_carry_c(int* ssscm_c, int* sssgm_c, int* ssspm_c){
     for(int m = 0; m < nsupersupersections; m++){
@@ -201,15 +185,17 @@ void compute_super_super_section_carry_c(int* ssscm_c, int* sssgm_c, int* ssspm_
 
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
-
+// Each thread reads from ssscm and then iterates through 1 block
 __global__
 void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* ssscm_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index == 0){
+        sscl_c[0] = ssgl_c[0] | 0;
+    }
     if(threadIdx.x < nsupersupersections){
-        int index = blockIdx.x * blockDim.x + threadIdx.x;
-        sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
+        if(index != 0)
+            sscl_c[index * block_size] = ssgl_c[index * block_size] | (sspl_c[index * block_size] & ssscm_c[index]);
+        __syncthreads();
         index *= block_size;
         for(int l = 1; l < block_size; l++){
             if(index + l < nsupersections){
@@ -219,14 +205,17 @@ void compute_super_section_carry_c(int* sscl_c, int* ssgl_c, int* sspl_c, int* s
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
+// Each thread reads from sscl and iterates through 1 block
 __global__
 void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index == 0){
+        sck_c[0] = sgk_c[0] | 0;
+    }
     if(threadIdx.x < nsupersections){
-        int index = blockIdx.x * blockDim.x + threadIdx.x;
-        sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
+        if(index != 0)
+            sck_c[index * block_size] = sgk_c[index * block_size] | (spk_c[index * block_size] & sscl_c[index]);
+        __syncthreads();
         index *= block_size;
         for(int k = 1; k < block_size; k++){
             if(index + k < nsections){
@@ -236,15 +225,17 @@ void compute_section_carry_c(int* sck_c, int* sgk_c, int* spk_c, int* sscl_c){
     }
 }
 
-
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
+// Each thread reads from sck and iterates through 1 block
 __global__
 void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if(index == 0){
+        gcj_c[0] = ggc_c[0] | 0;
+    }
     if(threadIdx.x < nsections){
-        int index = blockIdx.x * blockDim.x + threadIdx.x;
-        gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
+        if(index != 0)
+            gcj_c[index * block_size] = ggj_c[index * block_size] | (gpj_c[index * block_size] & sck_c[index]);
+        __syncthreads();
         index *= block_size;
         for(int j = 1; j < block_size; j++){
             if(index + j < ngroups){
@@ -254,9 +245,7 @@ void compute_group_carry_c(int* gcj_c, int* ggj_c, int* gpj_c, int* sck_c){
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
+// Each thread reads from gcj and iterates through 1 block
 __global__
 void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -276,9 +265,7 @@ void compute_carry_c(int* ci_c, int* gi_c, int* pi_c, int* gcj_c){
     }
 }
 
-/***********************************************************************************************************/
-// ADAPT AS CUDA KERNEL
-/***********************************************************************************************************/
+// Unrolled loop so each thread gets 1 bit to work with.
 __global__
 void compute_sum_c(int* sumi_c, int* bin1_c, int* bin2_c, int* ci_c){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -290,12 +277,8 @@ void compute_sum_c(int* sumi_c, int* bin1_c, int* bin2_c, int* ci_c){
 
 void cla()
 {
-  /***********************************************************************************************************/
-  // ADAPT ALL THESE FUNCTUIONS TO BE SEPARATE CUDA KERNEL CALL
-  // NOTE: Kernel calls are serialized by default per the CUDA kernel call scheduler
-  /***********************************************************************************************************/
 
-
+    // Malloc bin1 and bin2 so GPU can read, and copy data over.
     int* bin1_cuda, *bin2_cuda;
     cudaMallocManaged(&bin1_cuda, bits*sizeof(int));
     cudaMallocManaged(&bin2_cuda, bits*sizeof(int));
@@ -306,6 +289,8 @@ void cla()
     }
 
     int blockSize = 256;
+
+    // Call all kernels, allocating arrays as needed
 
     int* gi_cuda, *pi_cuda;
     cudaMallocManaged(&gi_cuda, bits*sizeof(int));
@@ -361,6 +346,8 @@ void cla()
     cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
     compute_sum_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(sumi_cuda, bin1_cuda, bin2_cuda, ci_cuda);
 
+
+    // Synchronize and copy result into sumi from sumi_c
     cudaDeviceSynchronize();
 
     sumi_cuda[0] = bin1_cuda[0] ^ bin2_cuda[0] ^ 0;
@@ -369,29 +356,25 @@ void cla()
         sumi[i] = sumi_cuda[i];
     }
 
-  /***********************************************************************************************************/
-  // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
-  /***********************************************************************************************************/
-
-
-  cudaFree(bin1_cuda);
-  cudaFree(bin2_cuda);
-  cudaFree(gi_cuda);
-  cudaFree(pi_cuda);
-  cudaFree(ggj_cuda);
-  cudaFree(gpj_cuda);
-  cudaFree(sgk_cuda);
-  cudaFree(spk_cuda);
-  cudaFree(ssgl_cuda);
-  cudaFree(sspl_cuda);
-  cudaFree(sssgm_cuda);
-  cudaFree(ssspm_cuda);
-  cudaFree(ssscm_cuda);
-  cudaFree(sscl_cuda);
-  cudaFree(sck_cuda);
-  cudaFree(gcj_cuda);
-  cudaFree(ci_cuda);
-  cudaFree(sumi_cuda);
+    // Free all cuda malloc'd memory.
+    cudaFree(bin1_cuda);
+    cudaFree(bin2_cuda);
+    cudaFree(gi_cuda);
+    cudaFree(pi_cuda);
+    cudaFree(ggj_cuda);
+    cudaFree(gpj_cuda);
+    cudaFree(sgk_cuda);
+    cudaFree(spk_cuda);
+    cudaFree(ssgl_cuda);
+    cudaFree(sspl_cuda);
+    cudaFree(sssgm_cuda);
+    cudaFree(ssspm_cuda);
+    cudaFree(ssscm_cuda);
+    cudaFree(sscl_cuda);
+    cudaFree(sck_cuda);
+    cudaFree(gcj_cuda);
+    cudaFree(ci_cuda);
+    cudaFree(sumi_cuda);
 }
 
 void ripple_carry_adder()
