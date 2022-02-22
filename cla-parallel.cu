@@ -52,7 +52,6 @@ int* bin2=NULL;
 char* hex1=NULL;
 char* hex2=NULL;
 
-int* sumi_cuda;
 
 void read_input()
 {
@@ -614,7 +613,7 @@ void cla()
     cudaMallocManaged(&ci_cuda, bits*sizeof(int));
     compute_carry_c<<<(ngroups + blockSize -1)/blockSize, blockSize>>>(ci_cuda, gi_cuda, pi_cuda, gcj_cuda);
 
-
+    int* sumi_cuda;
     cudaMallocManaged(&sumi_cuda, bits*sizeof(int));
     compute_sum_c<<<(bits + blockSize -1)/blockSize, blockSize>>>(sumi_cuda, bin1_cuda, bin2_cuda, ci_cuda);
 
@@ -673,7 +672,9 @@ void cla()
         }
     printf("%d\n", count4);
 
-
+    for(int i = 0; i < bits; i++){
+        sumi[i] = sumi_cuda[i];
+    }
   /***********************************************************************************************************/
   // INSERT RIGHT CUDA SYNCHRONIZATION AT END!
   /***********************************************************************************************************/
@@ -696,7 +697,7 @@ void cla()
   cudaFree(sck_cuda);
   cudaFree(gcj_cuda);
   cudaFree(ci_cuda);
-
+  cudaFree(sumi_cuda);
 }
 
 void ripple_carry_adder()
@@ -715,7 +716,7 @@ void check_cla_rca()
 {
   for(int i = 0; i < bits; i++)
     {
-      if( sumrca[i] != sumi_cuda[i] )
+      if( sumrca[i] != sumi[i] )
 	{
 	  printf("Check: Found sumrca[%d] = %d, not equal to sumi[%d] = %d - stopping check here!\n",
 		 i, sumrca[i], i, sumi[i]);
@@ -785,7 +786,7 @@ int main(int argc, char *argv[])
 
   if( verbose==1 )
     {
-      int2str_result = int_to_string(sumi_cuda,bits);
+      int2str_result = int_to_string(sumi,bits);
       hexSum = revbinary_to_hex( int2str_result,bits);
     }
 
@@ -821,6 +822,7 @@ int main(int argc, char *argv[])
     printf("%s\n",hexSum);
 
   free(hexSum);
+
 
   return 1;
 }
